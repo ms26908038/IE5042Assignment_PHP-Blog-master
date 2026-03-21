@@ -22,7 +22,7 @@
     server with default setting (user 'root' with no password) */
     define('DB_SERVER', 'localhost');
     define('DB_USERNAME', 'root');
-    define('DB_PASSWORD', '');
+    define('DB_PASSWORD', '1234');
     define('DB_NAME', 'blog');
 
     /* Attempt to connect to MySQL database */
