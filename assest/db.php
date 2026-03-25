@@ -1,39 +1,19 @@
 <?php
+require_once __DIR__ . '/../env_loader.php';
+loadEnv(__DIR__ . '/../.env');
 
-    // // Declare DB Variables
-    // $servername  = "localhost";
-    // $username = "root";
-    // $password = "";
-    // $dbname = "blog";
+// fallback to original values IF .env is missing
+$server   = $_ENV['DB_SERVER']   ?? 'localhost';
+$user     = $_ENV['DB_USERNAME'] ?? 'root';
+$pass     = $_ENV['DB_PASSWORD'] ?? '1234'; // friend's password stays as fallback
+$name     = $_ENV['DB_NAME']     ?? 'blog';
 
-    // // Create connection
-    // try {
-    //     $conn = new PDO("mysql:host=$servername;dbname=$dbname", $username, $password);
-    //     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    //     $GLOBALS['conn'] = $conn;
+try {
+    $pdo = new PDO("mysql:host=$server;dbname=$name", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $GLOBALS['conn'] = $pdo;
 
-    // } catch(PDOException $e) {
-    //     $GLOBALS['e'] = $e;
-    //     echo "Connection failed: " . $e->getMessage();
-    // }
-
-
-    /* Database credentials. Assuming you are running MySQL
-    server with default setting (user 'root' with no password) */
-    define('DB_SERVER', 'localhost');
-    define('DB_USERNAME', 'root');
-    define('DB_PASSWORD', '1234');
-    define('DB_NAME', 'blog');
-
-    /* Attempt to connect to MySQL database */
-    try{
-        $pdo = new PDO("mysql:host=" . DB_SERVER . ";dbname=" . DB_NAME, DB_USERNAME, DB_PASSWORD);
-        // Set the PDO error mode to exception
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $GLOBALS['conn'] = $pdo;
-
-    } catch(PDOException $e){
-        $GLOBALS['e'] = $e;
-        die("ERROR: Could not connect. " . $e->getMessage());
-    }
-
+} catch(PDOException $e){
+    $GLOBALS['e'] = $e;
+    die("ERROR: Could not connect. " . $e->getMessage());
+}
