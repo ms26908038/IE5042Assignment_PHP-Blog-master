@@ -1,349 +1,241 @@
 <?php require "db.php"; ?>
 <?php
+/***********************************************************************
+ * INSERT ENDPOINT — SECURITY HARDENED
+ * - Prevents SQLi / parameter tampering on ?type and posted IDs
+ * - Removes attacker control over table names
+ * - Safer file uploads (random names, MIME/size checks)
+ * - Keeps business logic; prepared statements used for VALUES
+ ***********************************************************************/
 
-/*
-// Get type from header
-$type = $_GET['type'];
-
-if ($conn) {
-
-    if (isset($_POST["submit"])) {
-
-        switch ($type) {
-            case "article":
-                // Upload Image
-                uploadImage2("arImage", "../img/article/");
-
-                // PREPARE DATA TO INSERT INTO DB
-                $data = array(
-                    "article_title" => test_input($_POST["arTitle"]),
-                    "article_content" => $_POST["arContent"],
-                    "article_image" => test_input($_FILES["arImage"]["name"]),
-                    "article_created_time" => date('Y-m-d H:i:s'),
-                    "id_categorie" => test_input($_POST["arCategory"]),
-                    "id_author" => test_input($_POST["arAuthor"])
-                );
-
-                // $tableName = 'article';
-
-                // Call insert function
-                insertToDB($conn, $type, $data);
-
-                // Go to show.php
-                header("Location: ../index.php", true, 301);
-                exit;
-                break;
-
-            case "category":
-
-                // Upload Image
-                uploadImage2("catImage", "../img/category/");
-
-                // PREPARE DATA TO INSERT INTO DB
-                $data = array(
-                    "category_name"  => test_input($_POST["catName"]),
-                    "category_image" => test_input($_FILES["catImage"]["name"]),
-                    "category_color" => test_input($_POST["catColor"]),
-                );
-
-                // $tableName = 'category';
-
-                // Call insert function
-                insertToDB($conn, $type, $data);
-
-                // Go to show.php
-                header("Location: ../categories.php", true, 301);
-                exit;
-                break;
-
-            case "author":
-
-                // Upload Image
-                uploadImage2("authImage", "../img/avatar/");
-
-                // PREPARE DATA TdO INSERT INTO DB
-                $data = array(
-                    "author_fullname" => test_input($_POST["authName"]),
-                    "author_desc" => test_input($_POST["authDesc"]),
-                    "author_email" =>  test_input($_POST["authEmail"]),
-                    "author_twitter" =>  test_input($_POST["authTwitter"]),
-                    "author_github" => test_input($_POST["authGithub"]),
-                    "author_link" => test_input($_POST["authLinkedin"]),
-                    "author_avatar" => test_input($_FILES["authImage"]["name"])
-                );
-
-                $tableName = 'author';
-
-                // Call insert function
-                insertToDB($conn, $tableName, $ata);
-
-                // Go to show.php
-                header("Location: ../author.php", true, 301);
-                exit;
-                break;
-
-            case "comment":
-
-                $id = test_input($_POST["id_article"]);
-
-                // PREPARE DATA TO INSERT INTO DB
-                $data = array(
-                    "comment_username" => test_input($_POST["username"]),
-                    // "comment_avatar" => test_input($_POST["comment_avatar"]),
-                    "comment_content" => test_input($_POST["comment"]),
-                    "comment_date" => date('Y-m-d H:i:s'),
-                    "id_article" =>  test_input($_POST["id_article"])
-                );
-
-                $tableName = 'comment';
-
-                // Call insert function
-                insertToDB($conn, $tableName, $data);
-
-                // Go to show.php
-                header("Location: ../single_article.php?id=$id", true, 301);
-                exit;
-                break;
-
-            default:
-                echo "ERROR";
-                break;
-        }
-    }
-} else {
-    echo 'Error: ' . $e->getMessage();
+/* ---------------------------- INPUT GATE ---------------------------- */
+// ✅ FIX: Whitelist the insert type (block tampering like ?type=users)
+$allowed_types = ['article', 'category', 'author', 'comment'];
+$type = $_GET['type'] ?? '';
+if (!in_array($type, $allowed_types, true)) {
+    http_response_code(400);
+    exit('ERROR: Invalid Type');
 }
 
+if (!$conn) {
+    // ✅ FIX: Do not leak sensitive errors to users
+    error_log("DB connection not available in insert.php");
+    http_response_code(500);
+    exit("An internal connection error occurred.");
+}
+
+/* ---------------------------- MAIN FLOW ---------------------------- */
+if (isset($_POST["submit"])) {
+    switch ($type) {
+
+        /* ============================= ARTICLE ============================= */
+        case "article":
+            // ✅ FIX: Validate foreign keys as integers
+            $catId   = filter_var($_POST["arCategory"] ?? null, FILTER_VALIDATE_INT);
+            $authId  = filter_var($_POST["arAuthor"]   ?? null, FILTER_VALIDATE_INT);
+            if (!$catId || !$authId) {
+                http_response_code(400);
+                exit('Invalid category/author');
+            }
+
+            // Safer text handling
+            $title   = test_input($_POST["arTitle"] ?? '');
+            $content = $_POST["arContent"] ?? ''; // rich HTML (we sanitize on output later)
+
+            // ✅ FIX: Use hardened upload that returns a randomized stored filename
+            $imageName = '';
+            if (isset($_FILES["arImage"]) && $_FILES["arImage"]["error"] === 0) {
+                $imageName = secureUpload("arImage", "../img/article/");
+            }
+
+            $data = [
+                "article_title"        => $title,
+                "article_content"      => $content,
+                "article_image"        => $imageName,
+                "article_created_time" => date('Y-m-d H:i:s'),
+                "id_categorie"         => $catId,
+                "id_author"            => $authId
+            ];
+
+            // ✅ FIX: Hard-code destination table name (no dynamic $type)
+            insertToDB($conn, 'article', $data);
+
+            header("Location: ../index.php", true, 301);
+            exit;
+
+
+        /* ============================ CATEGORY ============================= */
+        case "category":
+            $name  = test_input($_POST["catName"]  ?? '');
+            $color = test_input($_POST["catColor"] ?? '');
+
+            $imageName = '';
+            if (isset($_FILES["catImage"]) && $_FILES["catImage"]["error"] === 0) {
+                $imageName = secureUpload("catImage", "../img/category/");
+            }
+
+            $data = [
+                "category_name"  => $name,
+                "category_image" => $imageName,
+                "category_color" => $color,
+            ];
+
+            insertToDB($conn, 'category', $data);
+
+            header("Location: ../categories.php", true, 301);
+            exit;
+
+
+        /* ============================== AUTHOR ============================= */
+        case "author":
+            $fullname = test_input($_POST["authName"]     ?? '');
+            $desc     = test_input($_POST["authDesc"]     ?? '');
+            $email    = test_input($_POST["authEmail"]    ?? '');
+            $twitter  = test_input($_POST["authTwitter"]  ?? '');
+            $github   = test_input($_POST["authGithub"]   ?? '');
+            $linkedin = test_input($_POST["authLinkedin"] ?? '');
+
+            $imageName = '';
+            if (isset($_FILES["authImage"]) && $_FILES["authImage"]["error"] === 0) {
+                $imageName = secureUpload("authImage", "../img/avatar/");
+            }
+
+            $data = [
+                "author_fullname" => $fullname,
+                "author_desc"     => $desc,
+                "author_email"    => $email,
+                "author_twitter"  => $twitter,
+                "author_github"   => $github,
+                "author_link"     => $linkedin,
+                "author_avatar"   => $imageName
+            ];
+
+            insertToDB($conn, 'author', $data);
+
+            header("Location: ../author.php", true, 301);
+            exit;
+
+
+        /* ============================= COMMENT ============================= */
+        case "comment":
+            // ✅ FIX: Strict integer validation for foreign key (prevents SQLi / header injection)
+            $id = filter_var($_POST["id_article"] ?? null, FILTER_VALIDATE_INT);
+            if (!$id) {
+                header("Location: ../index.php", true, 302);
+                exit;
+            }
+
+            $username = test_input($_POST["username"] ?? '');
+            $comment  = test_input($_POST["comment"]  ?? '');
+
+            $data = [
+                "comment_username" => $username,
+                "comment_content"  => $comment,
+                "comment_date"     => date('Y-m-d H:i:s'),
+                "id_article"       => $id
+            ];
+
+            insertToDB($conn, 'comment', $data);
+
+            // ✅ FIX: $id is validated integer; safe in redirect
+            header("Location: ../single_article.php?id={$id}#comment", true, 302);
+            exit;
+
+        default:
+            http_response_code(400);
+            exit("ERROR: Invalid Type");
+    }
+}
+
+/* ------------------------- DATA ACCESS LAYER ------------------------ */
 function insertToDB($conn, $table, $data)
 {
-
-    // Get keys string from data array
-    $columns = implodeArray(array_keys($data));
-
-    // Get values string from data array with prefix (:) added
-    $prefixed_array = preg_filter('/^/', ':', array_keys($data));
-    $values = implodeArray($prefixed_array);
-
-    try {
-        // prepare sql and bind parameters
-        $sql = "INSERT INTO $table ($columns) VALUES ($values)";
-        $stmt = $conn->prepare($sql);
-
-        // insert row
-        $stmt->execute($data);
-
-        echo "New records created successfully";
-    } catch (PDOException $error) {
-        echo $error;
-    }
-}
-
-function implodeArray($array)
-{
-    return implode(", ", $array);
-}
-
-function test_input($data)
-{
-    $data = trim($data);
-    $data = stripslashes($data);
-    $data = htmlspecialchars($data);
-    return $data;
-}
-
-// function uploadImage($name, $dest){
-//     // Upload Image
-//     $fileName = $_FILES[$name]['name'];
-//     $fileTmpName = $_FILES[$name]['tmp_name'];
-//     $fileError = $_FILES[$name]['error'];
-
-//     if($fileError === 0){
-//         $fileDestination = $dest.$fileName;
-//         move_uploaded_file($fileTmpName, $fileDestination);
-//         echo "Image Upload Successful";
-//     }else {
-//         echo "Image Upload Error";
-//     }
-// }
-
-function uploadImage2($name, $dest)
-{
-
-    $target_dir = $dest;
-    $target_file = $target_dir . basename($_FILES[$name]["name"]);
-    $uploadOk = 1;
-    $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-
-    // Check if image file is a actual image or fake image
-    $check = getimagesize($_FILES[$name]["tmp_name"]);
-    if ($check !== false) {
-        echo "File is an image - " . $check["mime"] . ".";
-        $uploadOk = 1;
-    } else {
-        echo "File is not an image.";
-        $uploadOk = 0;
+    // ✅ FIX: Defense‑in‑depth allow‑list (even though we hard‑code the table above)
+    $allowed = ['article', 'category', 'author', 'comment'];
+    if (!in_array($table, $allowed, true)) {
+        throw new RuntimeException('Blocked table name');
     }
 
-    // Check if file already exists
-    if (file_exists($target_file)) {
-        echo "Sorry, file already exists.";
-        $uploadOk = 0;
-    }
-    // Check file size
-    if ($_FILES[$name]["size"] > 500000) {
-        echo "Sorry, your file is too large.";
-        $uploadOk = 0;
-    }
-    // Allow certain file formats
-    if (
-        $imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg"
-        && $imageFileType != "gif"
-    ) {
-        echo "Sorry, only JPG, JPEG, PNG & GIF files are allowed.";
-        $uploadOk = 0;
-    }
-    // Check if $uploadOk is set to 0 by an error
-    if ($uploadOk == 0) {
-        echo "Sorry, your file was not uploaded.";
-        // if everything is ok, try to upload file
-    } else {
-        if (move_uploaded_file($_FILES[$name]["tmp_name"], $target_file)) {
-            echo "The file " . basename($_FILES[$name]["name"]) . " has been uploaded.";
-        } else {
-            echo "Sorry, there was an error uploading your file.";
-        }
-    }
-}
-
-?>
-*/
-
-// Get type from header - Recommended: validate this input too
-$type = filter_var($_GET['type'], FILTER_SANITIZE_SPECIAL_CHARS);
-
-if ($conn) {
-
-    if (isset($_POST["submit"])) {
-
-        switch ($type) {
-            case "article":
-                uploadImage2("arImage", "../img/article/");
-
-                $data = array(
-                    "article_title" => test_input($_POST["arTitle"]),
-                    "article_content" => $_POST["arContent"], // HTML content usually requires special handling
-                    "article_image" => test_input($_FILES["arImage"]["name"]),
-                    "article_created_time" => date('Y-m-d H:i:s'),
-                    "id_categorie" => test_input($_POST["arCategory"]),
-                    "id_author" => test_input($_POST["arAuthor"])
-                );
-
-                insertToDB($conn, $type, $data);
-                header("Location: ../index.php", true, 301);
-                exit;
-                break;
-
-            case "category":
-                uploadImage2("catImage", "../img/category/");
-
-                $data = array(
-                    "category_name"  => test_input($_POST["catName"]),
-                    "category_image" => test_input($_FILES["catImage"]["name"]),
-                    "category_color" => test_input($_POST["catColor"]),
-                );
-
-                insertToDB($conn, $type, $data);
-                header("Location: ../categories.php", true, 301);
-                exit;
-                break;
-
-            case "author":
-                uploadImage2("authImage", "../img/avatar/");
-
-                $data = array(
-                    "author_fullname" => test_input($_POST["authName"]),
-                    "author_desc" => test_input($_POST["authDesc"]),
-                    "author_email" =>  test_input($_POST["authEmail"]),
-                    "author_twitter" =>  test_input($_POST["authTwitter"]),
-                    "author_github" => test_input($_POST["authGithub"]),
-                    "author_link" => test_input($_POST["authLinkedin"]),
-                    "author_avatar" => test_input($_FILES["authImage"]["name"])
-                );
-
-                $tableName = 'author';
-                insertToDB($conn, $tableName, $data);
-                header("Location: ../author.php", true, 301);
-                exit;
-                break;
-
-            case "comment":
-                // FIX FOR W02: Use integer validation for IDs used in Headers
-                $raw_id = $_POST["id_article"];
-                $id = filter_var($raw_id, FILTER_VALIDATE_INT);
-
-                if (!$id) {
-                    // Fallback if ID is malicious or invalid
-                    header("Location: ../index.php"); 
-                    exit;
-                }
-
-                $data = array(
-                    "comment_username" => test_input($_POST["username"]),
-                    "comment_content" => test_input($_POST["comment"]),
-                    "comment_date" => date('Y-m-d H:i:s'),
-                    "id_article" => $id // Use the validated integer
-                );
-
-                $tableName = 'comment';
-                insertToDB($conn, $tableName, $data);
-
-                // FIXED SINK: $id is now guaranteed to be a safe integer
-                header("Location: ../single_article.php?id=$id", true, 301);
-                exit;
-                break;
-
-            default:
-                echo "ERROR: Invalid Type";
-                break;
-        }
-    }
-} else {
-    // SECURITY: Use generic error message instead of $e->getMessage() to prevent info leak
-    error_log("Connection failed: " . $e->getMessage());
-    echo "An internal connection error occurred.";
-}
-
-function insertToDB($conn, $table, $data)
-{
     $columns = implode(", ", array_keys($data));
-    $prefixed_array = preg_filter('/^/', ':', array_keys($data));
-    $values = implode(", ", $prefixed_array);
+    $placeholders = implode(", ", preg_filter('/^/', ':', array_keys($data)));
 
     try {
-        $sql = "INSERT INTO $table ($columns) VALUES ($values)";
+        $sql  = "INSERT INTO {$table} ({$columns}) VALUES ({$placeholders})";
         $stmt = $conn->prepare($sql);
         $stmt->execute($data);
+
     } catch (PDOException $error) {
-        // SECURITY: Log the real error, show the user a generic one
-        error_log("Database Error: " . $error->getMessage());
-        echo "Database submission failed.";
+        // ✅ FIX: Log internal error; don’t echo SQL or driver messages to the user
+        error_log("Insert({$table}) failed: " . $error->getMessage());
+        http_response_code(500);
+        exit("Database submission failed.");
     }
 }
 
+/* ---------------------------- INPUT UTILS --------------------------- */
 /**
- * FIXED W16: Context-Aware Security Utility
- * Strips newlines to prevent Header Injection and encodes HTML for XSS protection.
+ * ✅ FIX: Context‑aware sanitizer for text fields.
+ * Also strips CR/LF to reduce header‑injection risk when values are reused in redirects.
  */
 function test_input($data)
 {
+    $data = (string)$data;
     $data = trim($data);
     $data = stripslashes($data);
-    // REMOVAL OF CRLF: Specifically stops Header Injection (W02)
-    $data = str_replace(array("\r", "\n"), '', $data);
-    // XSS PROTECTION: Standard encoding
-    $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
-    return $data;
+    $data = str_replace(["\r", "\n"], '', $data); // header-injection guard
+    return htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
 }
 
-// ... rest of uploadImage2 function remains the same ...
-?>
+/* --------------------------- UPLOAD UTILS --------------------------- */
+/**
+ * ✅ FIX: Safer upload routine
+ * - Randomized file name (prevents overwrites & info disclosure)
+ * - MIME detection (finfo) + extension allow‑list
+ * - Size limit (~1 MB)
+ * - Creates destination dir if missing
+ * Returns the stored file name (not full path), or empty string on failure.
+ */
+function secureUpload($field, $destDir)
+{
+    if (!isset($_FILES[$field]) || $_FILES[$field]['error'] !== 0) {
+        return '';
+    }
+
+    // Ensure destination directory exists
+    if (!is_dir($destDir)) {
+        @mkdir($destDir, 0755, true);
+    }
+
+    $tmp  = $_FILES[$field]['tmp_name'];
+    $name = basename($_FILES[$field]['name']); // still not trusted for storage
+    $size = (int)$_FILES[$field]['size'];
+
+    // Size check (1 MB)
+    if ($size <= 0 || $size > 1024 * 1024) {
+        return '';
+    }
+
+    // MIME check (server-side)
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime  = $finfo->file($tmp) ?: '';
+
+    $allowedExt  = ['jpg','jpeg','png','gif'];
+    $allowedMime = ['image/jpeg','image/png','image/gif'];
+
+    // Extension & MIME allow-list
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowedExt, true) || !in_array($mime, $allowedMime, true)) {
+        return '';
+    }
+
+    // Randomized file name
+    $rand = bin2hex(random_bytes(8));
+    $stored = "{$rand}.{$ext}";
+    $target = rtrim($destDir, '/\\') . DIRECTORY_SEPARATOR . $stored;
+
+    if (!move_uploaded_file($tmp, $target)) {
+        return '';
+    }
+
+    return $stored;
+}

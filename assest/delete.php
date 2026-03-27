@@ -1,110 +1,75 @@
-<?php require "db.php"; ?>
 <?php
+require "db.php";
 
-/*
-// Get id & type from header
-$id = $_GET['id'];
-$type = $_GET['type'];
+session_start();
 
-if ($conn) {
-    switch ($type) {
-        case "article":
-            delete($conn, $type, $id, "article.php");
-            break;
-        case "category":
-            delete($conn, $type, $id, "categories.php");
-            break;
-        case "author":
-            delete($conn, $type, $id, "author.php");
-            break;
-        default:
-            break;
-    }
-} else {
-    echo 'Error: ' . $e->getMessage();
+// Allow POST only
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit('Method Not Allowed');
 }
 
-
-function delete($conn, $table, $id, $goto)
-{
-
-    $col = $table . "_id";
-
-    try {
-        // sql to delete a record
-        $sql = "DELETE FROM $table WHERE $col = $id";
-
-        // use exec() because no results are returned
-        $conn->exec($sql);
-        echo "$table Deleted Successfully";
-    } catch (PDOException $e) {
-        echo $sql . "<br>" . $e->getMessage();
-    }
-
-    $conn = null;
-
-    header("Location: ../$goto", true, 301);
-    exit;
+// CSRF
+if (!isset($_POST['csrf'], $_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $_POST['csrf'])) {
+    http_response_code(403);
+    exit('Invalid CSRF token');
 }
-?>
-*/
 
-// 1. Initial Source of Taint
-$type = $_GET['type'] ?? '';
-$raw_id = $_GET['id'] ?? '';
+// Validate inputs
+$allowed_types = ['article', 'category', 'author'];
+$type = $_POST['type'] ?? '';
+if (!in_array($type, $allowed_types, true)) {
+    http_response_code(400);
+    exit('Invalid type');
+}
 
-// 2. [W4 FIX] - Explicit Input Filtering
-// This ensures $id is a valid integer. If it's a script or string, it returns false.
+$raw_id = $_POST['id'] ?? null;
 $id = filter_var($raw_id, FILTER_VALIDATE_INT);
-
-// 3. Security Gate
-$allowed_types = ["article", "category", "author"];
-
-if (!$id || !in_array($type, $allowed_types)) {
-    // If an attacker sends ?id=<script> or ?id=1OR1, the filter returns false.
-    error_log("Security Warning: Invalid ID or Type attempted in delete.php. Input: " . $raw_id);
-    
-    // Fail-Safe: Stop execution immediately
-    die("Access Denied: Invalid Request Format.");
+if ($id === false) {
+    http_response_code(400);
+    exit('Invalid id');
 }
 
-// 4. Proceed only if the Gate is passed
-if ($conn) {
-    switch ($type) {
-        case "article":
-            delete($conn, "article", $id, "article.php");
-            break;
-        case "category":
-            delete($conn, "category", $id, "categories.php");
-            break;
-        case "author":
-            delete($conn, "author", $id, "author.php");
-            break;
-    }
+// Map table/column/redirect safely
+switch ($type) {
+    case 'article':
+        $table = 'article';
+        $idCol = 'article_id';
+        $goto  = '../article.php';
+        break;
+    case 'category':
+        $table = 'category';
+        $idCol = 'category_id';
+        $goto  = '../categories.php';
+        break;
+    case 'author':
+        $table = 'author';
+        $idCol = 'author_id';
+        $goto  = '../author.php';
+        break;
+    default:
+        http_response_code(400);
+        exit('Invalid operation');
 }
 
-function delete($conn, $table, $id, $goto)
-{
-    $col = $table . "_id";
-
-    try {
-        // [W1 FIX] - Parameterized Query
-        $sql = "DELETE FROM $table WHERE $col = :id";
-        $stmt = $conn->prepare($sql);
-        
-        // Bind parameter as Integer type
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-        $stmt->execute();
-        
-    } catch (PDOException $e) {
-        // [W3 & W4 FIX] - Sink Removal and Secure Logging
-        error_log("Database Error: " . $e->getMessage());
-        // Generic message only - prevents Reflected XSS
-        die("An internal error occurred.");
-    }
-
-    $conn = null;
-    header("Location: ../$goto", true, 301);
-    exit;
+if (!$conn) {
+    error_log("delete.php: DB connection unavailable");
+    http_response_code(500);
+    exit('Internal error');
 }
-?>
+
+try {
+    $sql = "DELETE FROM `$table` WHERE `$idCol` = :id";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+} catch (PDOException $e) {
+    error_log("delete.php: DB error on $table/$idCol id=$id → " . $e->getMessage());
+    http_response_code(500);
+    exit('Internal error');
+}
+
+// PRG
+header("Location: $goto", true, 303);
+exit;
