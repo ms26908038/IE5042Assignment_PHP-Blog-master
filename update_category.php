@@ -1,14 +1,33 @@
 <!-- Include Head -->
-<?php include "assest/head.php"; ?>
-<?php
+<?php 
+include "assest/head.php"; 
 
-$category_id = $_GET["id"];
+// ✅ 1. Validate Category ID (Prevents XSS & Parameter Tampering)
+$raw_id = $_GET['id'] ?? null;
+$category_id = filter_var($raw_id, FILTER_VALIDATE_INT);
 
-// Get category Data to display
+if (!$category_id) {
+    http_response_code(400);
+    exit("Invalid Category ID");
+}
+
+// ✅ 2. Get Category Data
 $stmt = $conn->prepare("SELECT * FROM category WHERE category_id = ?");
 $stmt->execute([$category_id]);
 $category = $stmt->fetch();
 
+if (!$category) {
+    http_response_code(404);
+    exit("Category not found");
+}
+
+// ✅ Normalize image filename (prevents path traversal)
+$currentImage = basename($category["category_image"]);
+
+// ✅ Helper for safe output encoding
+function e($v) {
+    return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+}
 ?>
 
 <title>Update Category</title>
@@ -18,7 +37,6 @@ $category = $stmt->fetch();
 
     <!-- Header -->
     <?php include "assest/header.php" ?>
-
 
     <!-- Main -->
     <main role="main" class="main">
@@ -32,49 +50,12 @@ $category = $stmt->fetch();
             <div class="row">
 
                 <div class="col-lg-12 mb-4">
-                    <!-- Form -->
-                    <form action="assest/update.php?type=category&id=<?= $category_id ?>&img=<?= $category["category_image"] ?>" method="POST" enctype="multipart/form-data">
+
+                    <!-- ✅ FIXED: Safe form action URL -->
+                    <form 
+                        action="assest/update.php?type=category&id=<?= e($category_id) ?>&img=<?= e($currentImage) ?>" 
+                        method="POST" enctype="multipart/form-data">
+
                         <div class="form-group">
                             <label for="catName">Category Name</label>
-                            <input type="text" class="form-control" name="catName" id="catName" value="<?= $category["category_name"] ?>">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="catImage">Category Image</label>
-                            <div class="custom-file">
-                                <input type="file" class="custom-file-input" name="catImage" id="catImage">
-                                <label class="custom-file-label" for="catImage"><?= $category["category_image"] ?></label>
-                            </div>
-                        </div>
-
-                        <div class="my-2" style="width: 200px;">
-                            <img class="w-100 h-auto" src="img/category/<?= $category["category_image"] ?>" alt="">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="catColor">Category Color</label>
-                            <input type="color" id="catColor" name="catColor" value="<?= $category["category_color"] ?>">
-                        </div>
-
-
-                        <div class="text-center">
-                            <button type="submit" name="update" class="btn btn-success btn-lg w-25">Update</button>
-                        </div>
-                    </form>
-                </div>
-
-
-
-            </div>
-
-        </div>
-
-    </main>
-
-    <!-- Footer -->
-    <!-- <?php include "assest/footer.php" ?> -->
-
-
-</body>
-
-</html>
+                            <input type="text" class="form-control" name="catName" id="catName" 
