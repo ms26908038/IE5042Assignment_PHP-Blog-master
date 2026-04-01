@@ -1,16 +1,21 @@
-<?php require "db.php"; ?>
-
 <?php
+require "db.php";
+
 // Initialize the session
 session_start();
+
+// Login status flag
 $loggedin = false;
 
-// Check if the user is already logged in, if yes then redirect him to welcome page
-if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-   $loggedin = true;
-    
+// ✅ CSRF Token (Create once per session)
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// Check if user is logged in
+if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
+    $loggedin = true;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -24,5 +29,4 @@ if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
     <!-- Bootstrap, FontAwesome, Custom Styles -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/font-awesome.css">
-    <!-- <link rel="stylesheet" href="css/footer.css">    -->
-    <!-- <link type="text/css" rel="stylesheet" href="css/style.css" /> -->
+</head>

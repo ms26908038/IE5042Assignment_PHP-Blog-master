@@ -21,10 +21,10 @@ if (!$category) {
     exit("Category not found");
 }
 
-// ✅ Normalize image filename (prevents path traversal)
+// ✅ Normalize image filename
 $currentImage = basename($category["category_image"]);
 
-// ✅ Helper for safe output encoding
+// ✅ Safe output helper
 function e($v) {
     return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 }
@@ -38,24 +38,63 @@ function e($v) {
     <!-- Header -->
     <?php include "assest/header.php" ?>
 
-    <!-- Main -->
     <main role="main" class="main">
 
-        <div class="jumbotron text-center ">
+        <div class="jumbotron text-center">
             <h1 class="display-3 font-weight-normal text-muted">Update a Category</h1>
         </div>
 
         <div class="container">
-
             <div class="row">
 
                 <div class="col-lg-12 mb-4">
 
-                    <!-- ✅ FIXED: Safe form action URL -->
+                    <!-- ✅ SAFE: form action sanitized -->
                     <form 
                         action="assest/update.php?type=category&id=<?= e($category_id) ?>&img=<?= e($currentImage) ?>" 
-                        method="POST" enctype="multipart/form-data">
+                        method="POST" 
+                        enctype="multipart/form-data">
+
+                        <!-- ✅ ✅ CSRF TOKEN added immediately after <form> -->
+                        <input type="hidden" name="csrf" value="<?= $_SESSION['csrf_token'] ?>">
 
                         <div class="form-group">
                             <label for="catName">Category Name</label>
-                            <input type="text" class="form-control" name="catName" id="catName" 
+                            <input type="text" class="form-control" name="catName" id="catName"
+                                   value="<?= e($category["category_name"]) ?>">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="catImage">Category Image</label>
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" name="catImage" id="catImage">
+                                <label class="custom-file-label" for="catImage">
+                                    <?= e($currentImage) ?>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="my-2" style="width: 200px;">
+                            <img class="w-100 h-auto" src="img/category/<?= e($currentImage) ?>" alt="Category Image">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="catColor">Category Color</label>
+                            <input type="color" id="catColor" name="catColor"
+                                   value="<?= e($category["category_color"]) ?>">
+                        </div>
+
+                        <div class="text-center">
+                            <button type="submit" name="update" class="btn btn-success btn-lg w-25">Update</button>
+                        </div>
+
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+</body>
+</html>
