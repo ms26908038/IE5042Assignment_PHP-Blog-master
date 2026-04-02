@@ -1,4 +1,5 @@
 <!-- Include Head -->
+<?php require_once 'config.php'; ?>
 <?php include "assest/head.php"; ?>
 <?php
 
@@ -16,6 +17,16 @@ $categories = $stmt->fetchAll();
 $stmt = $conn->prepare("SELECT * FROM `article` INNER JOIN category ON id_categorie=category_id order by RAND() LIMIT 4");
 $stmt->execute();
 $most_read_articles = $stmt->fetchAll();
+
+// --- ADD THE GOOGLE URL LOGIC ---//
+$google_login_url = "https://accounts.google.com/o/oauth2/v2/auth?" . http_build_query([
+    'client_id'     => GOOGLE_CLIENT_ID,
+    'redirect_uri'  => GOOGLE_REDIRECT_URL,
+    'response_type' => 'code',
+    'scope'         => 'email profile',
+    'access_type'   => 'offline',
+    'prompt'        => 'select_account'
+]);
 
 ?>
 
@@ -49,21 +60,28 @@ $most_read_articles = $stmt->fetchAll();
 
     <!-- Main -->
     <main class="main">
+    
+    <?php /*  -- ADD THE BUTTON to GOOGLE LOGIN --*/ ?>
 
-        <!-- Jumbotron -->
-        <div class="jumbotron text-center p-0 mb-0">
-            <div class="bg-div px-5 d-flex align-items-center">
+    <div class="jumbotron text-center p-0 mb-0">
+        <div class="bg-div px-5 d-flex align-items-center">
 
-                <div class="text-left w-50">
-                    <h1 class="display-4 text-white">Welcome to Dev Culture!</h1>
-                    <h2 class="display-5 text-white">Discover Dev tutorial and articles that you can read completely for free!</h2>
-
-                </div>
-
+            <div class="text-left w-50">
+                <h1 class="display-4 text-white">Welcome to Dev Culture!</h1>
+                <h2 class="display-5 text-white">Discover Dev tutorial and articles that you can read completely for free!</h2>
+                
+                <?php if (!isset($_SESSION['loggedin'])): ?>
+                    <a href="<?= $google_login_url ?>" class="btn btn-light btn-lg mt-3" style="border-radius: 5px; padding: 10px 20px;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google Logo" style="width: 20px; margin-right: 10px;">
+                        Login with Google
+                    </a>
+                <?php endif; ?>
 
             </div>
-        </div><!-- /Jumbotron -->
 
+        </div>
+    </div>```
+    
         <!-- Latest Articles -->
         <div class="section section-grey">
 
@@ -153,75 +171,7 @@ $most_read_articles = $stmt->fetchAll();
 
                             <?php endforeach;  ?>
 
-                            <!-- post -->
-                            <!-- <div class="col-md-12">
-                                <div class="post post-row">
-                                    <a class="post-img" href="blog-post.html"><img src="./img/post-4.jpg" alt=""></a>
-                                    <div class="post-body">
-                                        <div class="post-meta">
-                                            <a class="post-category cat-2" href="category.html">JavaScript</a>
-                                            <span class="post-date">March 27, 2018</span>
-                                        </div>
-                                        <h3 class="post-title"><a href="blog-post.html">Chrome Extension Protects Against JavaScript-Based CPU Side-Channel Attacks</a></h3>
-                                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam...</p>
-                                    </div>
-                                </div>
-                            </div> -->
-                            <!-- /post -->
-
-                            <!-- post -->
-                            <!-- <div class="col-md-12">
-                                <div class="post post-row">
-                                    <a class="post-img" href="blog-post.html"><img src="./img/post-6.jpg" alt=""></a>
-                                    <div class="post-body">
-                                        <div class="post-meta">
-                                            <a class="post-category cat-2" href="category.html">JavaScript</a>
-                                            <span class="post-date">March 27, 2018</span>
-                                        </div>
-                                        <h3 class="post-title"><a href="blog-post.html">Why Node.js Is The Coolest Kid On The Backend Development Block!</a></h3>
-                                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam...</p>
-                                    </div>
-                                </div>
-                            </div> -->
-                            <!-- /post -->
-
-                            <!-- post -->
-                            <!-- <div class="col-md-12">
-                                <div class="post post-row">
-                                    <a class="post-img" href="blog-post.html"><img src="./img/post-1.jpg" alt=""></a>
-                                    <div class="post-body">
-                                        <div class="post-meta">
-                                            <a class="post-category cat-4" href="category.html">Css</a>
-                                            <span class="post-date">March 27, 2018</span>
-                                        </div>
-                                        <h3 class="post-title"><a href="blog-post.html">CSS Float: A Tutorial</a></h3>
-                                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam...</p>
-                                    </div>
-                                </div>
-                            </div> -->
-                            <!-- /post -->
-
-                            <!-- post -->
-                            <!-- <div class="col-md-12">
-                                <div class="post post-row">
-                                    <a class="post-img" href="blog-post.html"><img src="./img/post-2.jpg" alt=""></a>
-                                    <div class="post-body">
-                                        <div class="post-meta">
-                                            <a class="post-category cat-3" href="category.html">Jquery</a>
-                                            <span class="post-date">March 27, 2018</span>
-                                        </div>
-                                        <h3 class="post-title"><a href="blog-post.html">Ask HN: Does Anybody Still Use JQuery?</a></h3>
-                                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam...</p>
-                                    </div>
-                                </div>
-                            </div> -->
-                            <!-- /post -->
-
-                            <!-- <div class="col-md-12">
-                                <div class="section-row">
-                                    <button class="primary-button center-block">Load More</button>
-                                </div>
-                            </div> -->
+                        
                         </div>
                     </div>
 
@@ -247,29 +197,6 @@ $most_read_articles = $stmt->fetchAll();
                                 </ul>
                             </div>
                         </div>
-                        <!-- <li><a href="#" class="cat-1">Web Design<span>340</span></a></li>
-                                    <li><a href="#" class="cat-2">JavaScript<span>74</span></a></li>
-                                    <li><a href="#" class="cat-4">JQuery<span>41</span></a></li>
-                                    <li><a href="#" class="cat-3">CSS<span>35</span></a></li> -->
-                        <!-- /catagories -->
-
-                        <!-- tags -->
-                        <!-- <div class="aside-widget">
-                            <div class="tags-widget">
-                                <ul>
-                                    <li><a href="#">Chrome</a></li>
-                                    <li><a href="#">CSS</a></li>
-                                    <li><a href="#">Tutorial</a></li>
-                                    <li><a href="#">Backend</a></li>
-                                    <li><a href="#">JQuery</a></li>
-                                    <li><a href="#">Design</a></li>
-                                    <li><a href="#">Development</a></li>
-                                    <li><a href="#">JavaScript</a></li>
-                                    <li><a href="#">Website</a></li>
-                                </ul>
-                            </div>
-                        </div> -->
-                        <!-- /tags -->
                     </div>
                 </div>
                 <!-- /row -->
