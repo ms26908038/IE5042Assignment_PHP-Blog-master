@@ -1,43 +1,39 @@
-<?php require "db.php"; ?>
+<?php // 1. Database Connection
+require "db.php"; //
 
-<?php
-
-// Set secure cookie parameters to fix the ZAP alert
+// 2. Set secure cookie parameters to fix ID: B04: Session Fixation / Hijacking (A07:2021) 
 session_set_cookie_params([
     'lifetime' => 0,
     'path' => '/',
     'domain' => '', 
-    'secure' => true,     // Only send over HTTPS
-    'httponly' => true,   // [FIXES THE ALERT] Prevents JS access
-    'samesite' => 'Lax'   // Helps prevent CSRF
+    'secure' => true,     // Only send over HTTPS (Note: may need 'false' for local XAMPP without SSL)
+    'httponly' => true,   // Prevents JavaScript from stealing the session cookie
+    'samesite' => 'Lax'   // Helps prevent CSRF attacks
 ]);
 
-// Initialize the session
-session_start();
+// 3. SECURE HEADERS IMPLEMENTATION for ID: B05: Clickjacking Risk
+// Prevent Clickjacking: Only your own site can frame itself.
+header("X-Frame-Options: SAMEORIGIN");
 
-// Generate a CSRF token
+// Modern Clickjacking fix: Only allow framing by the same domain.
+header("Content-Security-Policy: frame-ancestors 'self';");
+
+// Prevents the browser from "sniffing" the MIME type (Prevents XSS)
+header("X-Content-Type-Options: nosniff");
+
+// 4. Initialize the session
+session_start(); //
+
+// 5. CSRF Token Generation (Used in your login form) for ID: B02: Missing Anti-Cross-Site Request Forgery (CSRF) Token
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+// 6. Check Login Status
 $loggedin = false;
-
-// Check if the user is already logged in, if yes then redirect him to welcome page
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-  
-// This makes the old session ID useless to an attacker
-    if (!isset($_SESSION['rotated'])) {
-        session_regenerate_id(true);
-        $_SESSION['rotated'] = true;
-    }
-
-$loggedin = true;
-
-//}
-
-
+   $loggedin = true; //
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
