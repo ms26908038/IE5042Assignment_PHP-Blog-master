@@ -1,7 +1,8 @@
-<?php include "assest/head.php"; ?>
-<?php
+<?php 
+// 1. Include head.php (This already starts the session, connects to DB, and generates the token)
+include "assest/head.php"; 
 
-// Check if the user is already logged in, if yes then redirect him to welcome page
+// Check if the user is already logged in, if yes then redirect him to index
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
     header("location: index.php");
     exit;
@@ -11,8 +12,15 @@ if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
 $username = $password = "";
 $username_err = $password_err = "";
 
-// Processing form data when form is submitted
+// 2. Processing form data when form is submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    // --- CSRF VALIDATION ---
+    // Since head.php generated the token, we just check if the form's token matches the session
+    if (!isset($_POST['token']) || $_POST['token'] !== $_SESSION['csrf_token']) {
+        die("CSRF token validation failed. Unauthorized request.");
+    }
+    // -----------------------
 
     // Check if username is empty
     if (empty(trim($_POST["username"]))) {
@@ -31,104 +39,80 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Validate credentials
     if (empty($username_err) && empty($password_err)) {
         // Prepare a select statement
+        // Note: Using $conn because that is what you used in your db.php
         $sql = "SELECT * FROM users WHERE username = :username";
 
-        if ($stmt = $pdo->prepare($sql)) {
-            // Bind variables to the prepared statement as parameters
+        if ($stmt = $conn->prepare($sql)) {
             $stmt->bindParam(":username", $param_username, PDO::PARAM_STR);
-
-            // Set parameters
             $param_username = trim($_POST["username"]);
 
-            // Attempt to execute the prepared statement
             if ($stmt->execute()) {
-                // Check if username exists, if yes then verify password
                 if ($stmt->rowCount() == 1) {
                     if ($row = $stmt->fetch()) {
-                        $id = $row["id"];
+                        $id = $row["user_id"]; 
                         $username = $row["username"];
                         $hashed_password = $row["password"];
+                        
                         if (password_verify($password, $hashed_password)) {
-                            // Password is correct, so start a new session
-                            session_start();
-
-                            // Store data in session variables
+                            // Password is correct, store data in session
                             $_SESSION["loggedin"] = true;
                             $_SESSION["id"] = $id;
                             $_SESSION["username"] = $username;
 
-                            // Redirect user to welcome page
+                            // Security: Regenerate ID to prevent Session Fixation
+                            session_regenerate_id(true);
+
                             header("location: index.php");
+                            exit;
                         } else {
-                            // Display an error message if password is not valid
                             $password_err = "The password you entered was not valid.";
                         }
                     }
                 } else {
-                    // Display an error message if username doesn't exist
                     $username_err = "No account found with that username.";
                 }
             } else {
                 echo "Oops! Something went wrong. Please try again later.";
             }
-
-            // Close statement
             unset($stmt);
         }
     }
-
-    // Close connection
-    unset($pdo);
 }
 ?>
 
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <!-- Required meta tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="img/logo/flogo.png" sizes="32x32" type="image/png">
-
-    <!-- Bootstrap, FontAwesome, Custom Styles -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/font-awesome.css">
     <link type="text/css" rel="stylesheet" href="css/style.css" />
-
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css?family=Nunito+Sans:700%7CNunito:300,600" rel="stylesheet">
-
-
     <title>Login</title>
 </head>
 
 <body class="d-flex flex-column min-vh-100">
 
-    <!-- Header -->
     <?php include "assest/header.php" ?>
-    <!-- </Header> -->
 
-    <!-- Main -->
     <main class="main">
-
-        <!-- Latest Articles -->
         <div class="section jumbotron mb-0 h-100">
-            <!-- container -->
             <div class="container d-flex flex-column justify-content-center align-items-center h-100">
-
+                
                 <div class="wrapper my-0 pt-3 bg-white w-50 text-center">
-                    <img src="img/logo/logo.png" alt="dev culture logo" style="width: 100px;height: auto;">
+                    <img src="img/logo/logo.png" alt="logo" style="width: 100px;height: auto;">
                 </div>
 
-                <!-- row -->
                 <div class="wrapper bg-white rounded px-4 py-4 w-50">
-
                     <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="POST">
+                        
+                        <input type="hidden" name="token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" name="username" class="form-control <?= (!empty($username_err)) ? 'is-invalid' : ''; ?>" value="">
+                            <input type="text" name="username" class="form-control <?= (!empty($username_err)) ? 'is-invalid' : ''; ?>" value="<?= htmlspecialchars($username); ?>">
                             <span class="invalid-feedback"><?= $username_err; ?></span>
                         </div>
                         <div class="form-group">
@@ -142,23 +126,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <p><a href="#" class="text-muted">Lost your password?</a></p>
                     </form>
                 </div>
-
-                <!-- /row -->
-
             </div>
-            <!-- /container -->
         </div>
+    </main>
 
-
-    </main><!-- </Main> -->
-
-    <!-- Footer -->
-    <!-- <?php include "assest/footer.php" ?> -->
-
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
 </body>
-
 </html>
