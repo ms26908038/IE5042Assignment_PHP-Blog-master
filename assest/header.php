@@ -1,4 +1,4 @@
-// Remove Default Login Button from Header
+<?php /* -- Remove Default Login Button from Header --*/ ?>
 <header class="blog-header border-bottom shadow-sm bg-white">
     <div class="container-fluid" style="padding-left: 3rem; padding-right:3rem">
 
