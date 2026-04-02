@@ -4,6 +4,12 @@
 
 // Initialize the session
 session_start();
+
+// Generate a CSRF token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $loggedin = false;
 
 // Check if the user is already logged in, if yes then redirect him to welcome page
