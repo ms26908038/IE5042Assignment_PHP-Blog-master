@@ -2,6 +2,16 @@
 
 <?php
 
+// Set secure cookie parameters to fix the ZAP alert
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'domain' => '', 
+    'secure' => true,     // Only send over HTTPS
+    'httponly' => true,   // [FIXES THE ALERT] Prevents JS access
+    'samesite' => 'Lax'   // Helps prevent CSRF
+]);
+
 // Initialize the session
 session_start();
 
@@ -14,7 +24,17 @@ $loggedin = false;
 
 // Check if the user is already logged in, if yes then redirect him to welcome page
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-   $loggedin = true;
+  
+// This makes the old session ID useless to an attacker
+    if (!isset($_SESSION['rotated'])) {
+        session_regenerate_id(true);
+        $_SESSION['rotated'] = true;
+    }
+
+$loggedin = true;
+
+//}
+
 
 }
 
