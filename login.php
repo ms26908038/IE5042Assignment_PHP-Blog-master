@@ -4,8 +4,8 @@ include "assest/head.php";
 
 // Check if the user is already logged in, if yes then redirect him to index
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-    header("location: index.php");
-    exit;
+    header("Location: /index.php");
+    exit();
 }
 
 // Define variables and initialize with empty values
